@@ -1,4 +1,4 @@
-module Palette exposing (FontSize(..), black, blue500, fontSize, green300, maxWidth, muted, purple600, warning, white)
+module Palette exposing (FontSize(..),regalBold, regal, green500, black, blue500, fontSize, green300, maxWidth, muted, purple600, warning, white, green700)
 
 import Element exposing (..)
 import Element.Font as Font
@@ -128,6 +128,13 @@ green300 : Color
 green300 =
     rgb255 110 231 183
 
+green500 : Color
+green500 =
+    rgb255 16 185 129
+
+green700 : Color
+green700 =
+    rgb255 4 120 87
 
 blue500 : Color
 blue500 =
@@ -137,3 +144,11 @@ blue500 =
 purple600 : Color
 purple600 =
     rgb255 124 58 237
+
+regalBold : Attribute msg
+regalBold =
+    Font.family [ Font.typeface "regalBold", Font.sansSerif]
+
+regal : Attribute msg
+regal =
+    Font.family [ Font.typeface "regal", Font.sansSerif]
