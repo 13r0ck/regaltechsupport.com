@@ -1,0 +1,31 @@
+.blur {
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+@supports (-webkit-backdrop-filter: blur(10px) saturate(160%) contrast(45%) brightness(140%)) or
+  (backdrop-filter: blur(10px) saturate(160%) contrast(45%) brightness(140%)) {
+  .blur {
+    transition: all 0.5s ease-in-out;
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px) saturate(160%) contrast(45%) brightness(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%) contrast(45%) brightness(140%);
+  }
+}
+
+::selection {
+    background: orange;
+}
+
+@font-face {
+  font-family: 'regal';
+  src: url('/fonts/regal.otf');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'regalBold';
+  src: url('/fonts/regalBold.otf');
+  font-weight: normal;
+  font-style: normal;
+}
