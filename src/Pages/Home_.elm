@@ -1,17 +1,18 @@
-module Pages.Home_ exposing (Model, Msg, page)
+module Pages.Home_ exposing (Model, Msg, navbar, page)
 
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border exposing (rounded)
+import Element.Events as Events
 import Element.Font as Font exposing (center)
-import Element.Input as Input exposing (newPassword)
+import Element.Input as Input exposing (OptionState, newPassword)
 import Element.Region as Region
 import Email
 import Gen.Params.Home_ exposing (Params)
 import Html exposing (br)
 import Html.Attributes exposing (accept, class, id)
 import Html.Events
-import Http
+import Http exposing (Error(..))
 import Json.Decode as Json
 import Json.Encode as Encode
 import List exposing (intersperse)
@@ -52,13 +53,20 @@ type alias Model =
     , wordsLen : Maybe Int
     , alertCopy : Alert
     , alertSubmit : Alert
+    , showContactUs : Bool
+    , contactName : String
+    , contactEmail : String
+    , contactMsg : String
+    , nameState : Alert
+    , emailState : Alert
+    , msgState : Alert
     }
 
 
 type Alert
-    = Good
-    | Bad
-    | DisplayHidden
+    = Good String
+    | Bad String
+    | None
 
 
 type alias PassCode =
@@ -97,8 +105,15 @@ init =
       , validEmail = Invalid
       , wordList = Nothing
       , wordsLen = Nothing
-      , alertCopy = DisplayHidden
-      , alertSubmit = DisplayHidden
+      , alertCopy = None
+      , alertSubmit = None
+      , showContactUs = False
+      , contactName = ""
+      , contactEmail = ""
+      , contactMsg = ""
+      , nameState = None
+      , emailState = None
+      , msgState = None
       }
     , Http.get { url = "/misc/words.txt", expect = Http.expectString GotWords }
     )
@@ -118,7 +133,12 @@ type Msg
     | ClearCopy ()
     | ClearSubmit ()
     | SubmitChecker
-    | CheckerSubmited (Result Http.Error FormResponse)
+    | Submited String (Result Http.Error FormResponse)
+    | ShowContactUs Bool
+    | ContactName String
+    | ContactEmail String
+    | ContactMsg String
+    | ContactUsSend
 
 
 type Email
@@ -225,43 +245,88 @@ update msg model =
             ( { model
                 | alertCopy =
                     if b then
-                        Good
+                        Good ""
 
                     else
-                        Bad
+                        Bad ""
               }
             , Task.perform ClearCopy (Process.sleep 2000)
             )
 
         ClearCopy _ ->
-            ( { model | alertCopy = DisplayHidden }, Cmd.none )
+            ( { model | alertCopy = None }, Cmd.none )
 
         ClearSubmit _ ->
-            ( { model | alertSubmit = DisplayHidden }, Cmd.none )
+            ( { model | alertSubmit = None, emailState = None, nameState = None, msgState = None }, Cmd.none )
 
         SubmitChecker ->
             if Email.isValid model.checker then
-                ( model, Http.post { url = "https://formspree.io/f/xrgoadlk", body = Http.jsonBody <| Encode.object [ ( "name", Encode.string model.checker ) ], expect = Http.expectJson CheckerSubmited (Json.map2 FormResponse (Json.field "next" Json.string) (Json.field "ok" Json.bool)) } )
+                ( model, Http.post { url = "https://formspree.io/f/xrgoadlk", body = Http.jsonBody <| Encode.object [ ( "name", Encode.string model.checker ) ], expect = Http.expectJson (Submited model.checker) (Json.map2 FormResponse (Json.field "next" Json.string) (Json.field "ok" Json.bool)) } )
 
             else
                 ( { model | validEmail = Error }, Cmd.none )
 
-        CheckerSubmited response ->
+        Submited email response ->
             ( { model
                 | alertSubmit =
                     case response of
                         Ok json ->
                             if json.ok then
-                                Good
+                                Good email
 
                             else
-                                Bad
+                                Bad ("Submission failed!" ++ json.next)
 
-                        error ->
-                            Bad
+                        Err httpError ->
+                            case httpError of
+                                BadUrl s ->
+                                    Bad s
+
+                                Timeout ->
+                                    Bad "Submission failed! Timeout"
+
+                                BadStatus i ->
+                                    Bad ("Submission failed! Status " ++ String.fromInt i)
+
+                                BadBody s ->
+                                    Bad ("Submission failed! Body " ++ s)
+
+                                NetworkError ->
+                                    Bad "Submission failed!Network Error"
               }
             , Task.perform ClearSubmit (Process.sleep 5000)
             )
+
+        ShowContactUs b ->
+            ( { model | showContactUs = b }, Cmd.none )
+
+        ContactName s ->
+            ( { model | contactName = s }, Cmd.none )
+
+        ContactEmail s ->
+            ( { model | contactEmail = s }, Cmd.none )
+
+        ContactMsg s ->
+            ( { model | contactMsg = s }, Cmd.none )
+
+        ContactUsSend ->
+            if String.isEmpty model.contactName then
+                ( { model | nameState = Bad "We missed your name. What was it again?" }
+                , Task.perform ClearSubmit (Process.sleep 5000)
+                )
+
+            else if not (Email.isValid model.contactEmail) then
+                ( { model | emailState = Bad "Something about that email is wrong." }
+                , Task.perform ClearSubmit (Process.sleep 5000)
+                )
+
+            else if String.isEmpty model.contactMsg then
+                ( { model | msgState = Bad "We dont know what to help you with!" }
+                , Task.perform ClearSubmit (Process.sleep 5000)
+                )
+
+            else
+                ( model, Http.post { url = "https://formspree.io/f/xgeplqze", body = Http.jsonBody <| Encode.object [ ( "name", Encode.string model.contactName ), ( "email", Encode.string model.contactEmail ), ( "message", Encode.string model.contactMsg ) ], expect = Http.expectJson (Submited model.contactEmail) (Json.map2 FormResponse (Json.field "next" Json.string) (Json.field "ok" Json.bool)) } )
 
 
 
@@ -290,7 +355,18 @@ view temp model =
             device == Phone
     in
     { title = "Regal Tech Support"
-    , attributes = [ inFront (navbar temp), inFront (copyalert temp model.alertCopy), inFront (submitalert temp model) ]
+    , attributes =
+        [ inFront (navbar temp)
+        , inFront
+            (if model.showContactUs then
+                contactUs temp model
+
+             else
+                none
+            )
+        , inFront (copyalert temp model.alertCopy)
+        , inFront (submitalert temp model)
+        ]
     , element =
         column [ width fill ]
             [ jumbotron temp
@@ -305,7 +381,7 @@ view temp model =
                 ]
                 [ column []
                     [ subTexts temp model.subText
-                    , Input.button [ centerX ] { onPress = Nothing, label = el [ paddingXY 40 15, regalBold, fontSize device Md, Font.color white, Border.rounded 10, htmlAttribute <| class "floatingBtn", Background.gradient { angle = degrees 45, steps = [ green300, blue500, purple600 ] } ] (text "Contact Us") }
+                    , Input.button [ centerX ] { onPress = Just (ShowContactUs True), label = el [ paddingXY 40 15, regalBold, fontSize device Md, Font.color white, Border.rounded 10, htmlAttribute <| class "floatingBtn", Background.gradient { angle = degrees 45, steps = [ green300, blue500, purple600 ] } ] (text "Contact Us") }
                     ]
                 , tools temp model
                 ]
@@ -324,37 +400,68 @@ copyalert temp state =
             temp.device.class
     in
     case state of
-        Good ->
+        Good _ ->
             el [ htmlAttribute <| class "slide_up_and_out", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Lg, Font.center, Background.color green500 ] (text "Copied!")
 
-        Bad ->
+        Bad _ ->
             el [ htmlAttribute <| class "slide_up_and_out", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Lg, Font.center, Background.color warning ] (text "Copy Failed.")
 
-        DisplayHidden ->
+        None ->
             Element.none
 
 
 submitalert : Temp -> Model -> Element Msg
 submitalert temp model =
     let
+        badlist =
+            List.filter
+                (\v ->
+                    case v of
+                        Bad _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                [ model.alertSubmit, model.emailState, model.nameState, model.msgState ]
+
+        goodlist =
+            List.filter
+                (\v ->
+                    case v of
+                        Good _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                [ model.alertSubmit, model.emailState, model.nameState, model.msgState ]
+
         state =
-            model.alertSubmit
+            if List.length badlist >= 1 then
+                Maybe.withDefault None (List.head badlist)
+
+            else if List.length goodlist >= 1 then
+                Maybe.withDefault None (List.head goodlist)
+
+            else
+                None
 
         device =
             temp.device.class
     in
     case state of
-        Good ->
-            paragraph [ htmlAttribute <| class "slide_up_and_out_long", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Md, Font.center, Background.color green500 ] [ text "Success!", html <| br [] [], text "We will contact you at ", text model.checker, text " soon!" ]
+        Good s ->
+            paragraph [ htmlAttribute <| class "slide_up_and_out_long", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Md, Font.center, Background.color green500 ] [ text "Success!", html <| br [] [], text "We will contact you at ", text s, text " soon!" ]
 
-        Bad ->
-            paragraph [ htmlAttribute <| class "slide_up_and_out_long", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Md, Font.center, Background.color warning ] [ text "Submission Failed.", html <| br [] [], text "Contact us at hello@regaltechsupport.com and we will manualy run the scan." ]
+        Bad s ->
+            paragraph [ htmlAttribute <| class "slide_up_and_out_long", width fill, paddingXY 0 25, alignBottom, regalBold, Font.color white, fontSize device Md, Font.center, Background.color warning ] [ text s ]
 
-        DisplayHidden ->
+        None ->
             Element.none
 
 
-navbar : Temp -> Element Msg
+navbar : Temp -> Element msg
 navbar temp =
     let
         device =
@@ -407,7 +514,7 @@ jumbotron temp =
             temp.width
 
         h =
-            temp.height + 2
+            temp.height
 
         scaleByHeight =
             (1.5 * toFloat h |> ceiling) > w
@@ -431,7 +538,7 @@ jumbotron temp =
                         ]
                         [ text "Regal Tech Support" ]
                     , paragraph [ Font.center, fontSize device Md, Region.heading 2, regal ] [ text "IT Support at home and at work in Colorado Springs." ]
-                    , Input.button [ centerX ] { onPress = Nothing, label = el [ paddingXY 40 15, regalBold, fontSize device Md, Font.color white, Border.rounded 10, htmlAttribute <| class "floatingBtn", Background.gradient { angle = degrees 45, steps = [ green300, blue500, purple600 ] } ] (text "Contact Us") }
+                    , Input.button [ centerX ] { onPress = Just (ShowContactUs True), label = el [ paddingXY 40 15, regalBold, fontSize device Md, Font.color white, Border.rounded 10, htmlAttribute <| class "floatingBtn", Background.gradient { angle = degrees 45, steps = [ green300, blue500, purple600 ] } ] (text "Contact Us") }
                     ]
                 , el [ height (fillPortion 4) ] none
                 ]
@@ -659,4 +766,146 @@ onEnter msg =
                             Json.fail "Not the enter key"
                     )
             )
+        )
+
+
+contactUs : Temp -> Model -> Element Msg
+contactUs temp model =
+    let
+        device =
+            temp.device.class
+
+        w =
+            temp.width
+
+        h =
+            temp.height
+
+        isPhone =
+            device == Phone
+
+        isBigDesktop =
+            device == BigDesktop
+
+        isDesktop =
+            device == Desktop
+
+        eachHeight =
+            px 50
+
+        contactInfo t =
+            el [ height (px 50), padding 5, Border.rounded 10, Font.color white, regalBold, Background.color purple600, width fill ] (el [ centerY ] (text t))
+    in
+    el
+        [ width fill
+        , height fill
+        , behindContent
+            (el
+                [ width fill
+                , height fill
+                , Background.gradient
+                    { angle = degrees 165
+                    , steps = [ rgba255 87 83 78 0.7, rgba255 17 24 39 0.9 ]
+                    }
+                , Events.onClick (ShowContactUs False)
+                ]
+                none
+            )
+        ]
+        (column
+            [ Background.color white
+            , width (px (min 600 w))
+            , height (px (min h 600))
+            , centerX
+            , centerY
+            , padding 25
+            , spacing 25
+            , Border.shadow { blur = 20, color = rgb 0.25 0.25 0.3, offset = ( 0, 0 ), size = 1 }
+            , rounded 25
+            , clip
+            , inFront
+                (row
+                    [ padding
+                        (if isPhone then
+                            0
+
+                         else
+                            5
+                        )
+                    , alignRight
+                    ]
+                    [ Input.button
+                        [ alignRight
+                        , Font.family [ Font.typeface "icons" ]
+                        , fontSize device Md
+                        , pointer
+                        , Font.color
+                            (if isDesktop || isBigDesktop then
+                                purple600
+
+                             else
+                                warning
+                            )
+                        , mouseOver [ Font.color warning ]
+                        ]
+                        { onPress = Just (ShowContactUs False), label = text "\u{E800}" }
+                    ]
+                )
+            ]
+            [ row [ spacing 25, width fill, fontSize device Sm ]
+                [ column [ width (fillPortion 2), spacing 10 ]
+                    [ contactInfo "To:"
+                    , contactInfo "Name:"
+                    , contactInfo "From:"
+                    ]
+                , column [ width (fillPortion 8), spacing 10 ]
+                    [ contactInfo "hello@regaltechsupport.com"
+                    , Input.text
+                        [ height eachHeight
+                        , Border.width 3
+                        , Border.color
+                            (case model.nameState of
+                                Bad _ ->
+                                    warning
+
+                                _ ->
+                                    purple600
+                            )
+                        , Border.rounded 10
+                        ]
+                        { label = Input.labelHidden "Name", onChange = ContactName, placeholder = Just (Input.placeholder [] (el [ regal ] (text "Can we get your name?"))), text = model.contactName }
+                    , Input.email
+                        [ height eachHeight
+                        , Border.width 3
+                        , Border.color
+                            (case model.emailState of
+                                Bad _ ->
+                                    warning
+
+                                _ ->
+                                    purple600
+                            )
+                        , Border.rounded 10
+                        ]
+                        { label = Input.labelHidden "email", onChange = ContactEmail, placeholder = Just (Input.placeholder [ height fill ] (el [ regal ] (text "email@example.com"))), text = model.contactEmail }
+                    ]
+                ]
+            , Input.multiline
+                [ height fill
+                , width fill
+                , fontSize device Sm
+                , Border.width 3
+                , Border.color
+                    (case model.msgState of
+                        Bad _ ->
+                            warning
+
+                        _ ->
+                            purple600
+                    )
+                , Border.rounded 10
+                ]
+                { label = Input.labelHidden "Message to Regal", spellcheck = True, onChange = ContactMsg, placeholder = Just (Input.placeholder [] (el [ regal ] (text "How can we help?"))), text = model.contactMsg }
+            , Input.button [ height eachHeight, alignBottom, fontSize device Sm, Font.color white, Background.gradient { angle = degrees 45, steps = [ green500, green700 ] }, width fill, regalBold, Font.center, Border.rounded 10, htmlAttribute <| class "floatingBtn" ] { onPress = Just ContactUsSend, label = text "Send!" }
+            ]
         )

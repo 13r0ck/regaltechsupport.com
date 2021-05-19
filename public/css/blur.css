@@ -30,6 +30,13 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: 'icons';
+  src: url('/fonts/icons.ttf');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @-webkit-keyframes floatingBtn {
   0% {
       box-shadow: none;
