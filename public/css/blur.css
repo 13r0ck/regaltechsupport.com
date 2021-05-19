@@ -29,3 +29,48 @@
   font-weight: normal;
   font-style: normal;
 }
+
+@-webkit-keyframes floatingBtn {
+  0% {
+      box-shadow: none;
+  }
+  100% {
+      box-shadow: 0px 5px 5px #565658e7;
+  }
+}
+
+@keyframes floatingBtn {
+  0% {
+      box-shadow: none;
+  }
+  100% {
+      box-shadow: 0px 5px 5px #565658e7;
+  }
+}
+.floatingBtn:hover {
+  -webkit-animation: floatingBtn ease-in-out 0.3s forwards;
+  animation: floatingBtn ease-in-out 0.3s forwards;
+}
+
+@keyframes slideUpAndOut {
+  0% {
+      transform: translateY(100%);
+  }
+  10% {
+      transform: translateY(0%);
+  }
+  90% {
+      transform: translateY(0%);
+  }
+  100% {
+      transform: translateY(100%);
+  }
+}
+.slide_up_and_out {
+  -webkit-animation: slideUpAndOut ease-in-out 2s forwards;
+  animation: slideUpAndOut ease-in-out 2s forwards;
+}
+.slide_up_and_out_long {
+  -webkit-animation: slideUpAndOut ease-in-out 5s forwards;
+  animation: slideUpAndOut ease-in-out 5s forwards;
+}

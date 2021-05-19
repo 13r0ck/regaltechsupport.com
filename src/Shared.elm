@@ -10,6 +10,7 @@ module Shared exposing
 
 import Browser.Events
 import Element exposing (..)
+import Http
 import Json.Decode as Json
 import Request exposing (Request)
 
