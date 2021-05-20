@@ -825,13 +825,7 @@ contactUs temp model =
             , clip
             , inFront
                 (row
-                    [ padding
-                        (if isPhone then
-                            0
-
-                         else
-                            5
-                        )
+                    [ padding 5
                     , alignRight
                     ]
                     [ Input.button

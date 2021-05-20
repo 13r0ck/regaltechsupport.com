@@ -13,6 +13,9 @@ import Gen.Params.Help exposing (Params)
 import Html exposing (br)
 import Html.Attributes exposing (accept, class, id)
 import Http
+import Json.Decode as Decode
+import Json.Decode.Pipeline exposing (hardcoded, optional, required)
+import Json.Encode as Encode
 import Page
 import Palette exposing (FontSize(..), black, blue500, fontSize, green300, green500, green700, maxWidth, muted, purple600, regal, regalBold, warning, white)
 import Request
@@ -51,10 +54,19 @@ type Msg
     = CodeChanged String
 
 
+type alias VerifyResponseHeader =
+    { access_control_allow_credentials : Bool
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         CodeChanged s ->
+            let
+                clean str =
+                    str |> String.trim |> String.replace "-" "" |> String.left 11
+            in
             if s |> String.toList |> List.all (\c -> List.any (\char -> c == char) [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-' ]) then
                 ( { model
                     | code =
@@ -65,7 +77,16 @@ update msg model =
                             s |> String.trim |> String.replace "-" "" |> addDashes "" |> String.left 11
                   }
                 , if String.length s == 11 then
-                    Nav.load ("https://help.remotepc.com/?id=" ++ s)
+                    {- This responds with the html data for the page.
+                        I Should be able to use this response to validate
+                        if the code is
+                        1. valid or not and then notify on regaltechsupport.com rather than error on the redirect
+                        2. Even download the app if the code is valid.
+                       Http.get { url = ("https://www.remotepc.com/rpchd/setupVerifyDownload?id=" ++ (clean s))
+                                , expect = Http.expectString VerifyResponse
+                                }
+                    -}
+                    Nav.load ("https://www.remotepc.com/rpchd/setupVerifyDownload?id=" ++ clean s)
 
                   else
                     Cmd.none
