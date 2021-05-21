@@ -1,5 +1,24 @@
-.DS_Store
+# Elm Spa
 .elm-spa
-elm-stuff
-node_modules
 dist
+
+# Distribution
+build/
+
+# elm-package generated files
+elm-stuff
+
+# elm-repl generated files
+repl-temp-*
+
+# Dependency directories
+node_modules
+
+# Desktop Services Store on macOS
+.DS_Store
+
+# Misc
+public/videos/earth_old.webm
+
+# Rust build
+server/target/
