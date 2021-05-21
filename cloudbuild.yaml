@@ -11,7 +11,7 @@
    args:
    - 'run'
    - 'deploy'
-   - 'website'
+   - 'rts-web'
    - '--image'
    - 'gcr.io/$PROJECT_ID/website:$COMMIT_SHA'
    - '--region'
